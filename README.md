@@ -50,3 +50,8 @@ If you encounter problems, please check:
 ---
 Version: 1.0
 Compatible with: Windows 10/11
+
+index.html and server.py are source files. Developers can build more features based on these two files, such as additional controllers and more innovative control methods (e.g., controlling pitchbend by shaking the mobile phone).
+
+Reference software: loopmidi
+https://www.tobias-erichsen.de/software/loopmidi.html
