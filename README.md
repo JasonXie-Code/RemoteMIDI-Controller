@@ -293,6 +293,9 @@ To create custom versions or modify the application:
 
 This project demonstrates real-time web-based MIDI control. Feel free to use, modify, and extend for your own projects.
 
+**Special Thanks:**
+- **Tobias Erichsen and the loopMIDI team** - Without loopMIDI's excellent virtual MIDI driver, this project would not be possible. Their free, reliable virtual MIDI solution is essential for enabling seamless communication between applications on Windows. Visit: https://www.tobias-erichsen.de/software/loopmidi.html
+
 **Dependencies:**
 - python-rtmidi: MIDI I/O library
 - websockets: WebSocket implementation
