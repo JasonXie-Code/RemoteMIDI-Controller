@@ -1,0 +1,1198 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>🎹 Mobile MIDI Controller</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            height: 100vh;
+            overflow: hidden;
+            touch-action: none;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            padding: 10px;
+        }
+
+        .header {
+            text-align: center;
+            padding: 10px 0;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            margin-bottom: 10px;
+        }
+
+        .title {
+            font-size: 1.5em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .sensitivity-button {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            cursor: pointer;
+            margin: 5px 0;
+            transition: all 0.2s ease;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .sensitivity-button:hover,
+        .sensitivity-button:active {
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(0.98);
+        }
+
+        .status {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 20px;
+            font-size: 0.9em;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #ff4444;
+        }
+
+        .status-dot.connected {
+            background: #44ff44;
+            box-shadow: 0 0 10px #44ff44;
+        }
+
+        .control-area {
+            flex: 1;
+            display: flex;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 15px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .left-margin {
+            width: 25%;
+            background: rgba(255, 255, 255, 0.1);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding: 20px;
+            position: relative;
+            border-right: 2px solid rgba(255, 255, 255, 0.6);
+        }
+
+        .left-margin::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            right: -2px;
+            width: 2px;
+            height: 60%;
+            background: rgba(255, 255, 255, 0.5);
+            transform: translateY(-50%);
+        }
+
+        .margin-label {
+            writing-mode: vertical-rl;
+            text-orientation: mixed;
+            font-size: 0.8em;
+            opacity: 0.7;
+            text-align: center;
+        }
+
+        .xy-pad {
+            flex: 1;
+            position: relative;
+            background: linear-gradient(to bottom, 
+                rgba(255, 100, 100, 0.3) 0%, 
+                rgba(255, 255, 255, 0.1) 50%, 
+                rgba(100, 255, 100, 0.3) 100%);
+            cursor: crosshair;
+            touch-action: none;
+        }
+
+        .xy-pad::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: rgba(255, 255, 255, 0.5);
+            transform: translateY(-1px);
+        }
+
+        .xy-pad::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            width: 2px;
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .active-area-overlay {
+            position: absolute;
+            border: 2px solid rgba(255, 255, 255, 0.6);
+            border-radius: 8px;
+            pointer-events: none;
+            transition: all 0.2s ease;
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .touch-indicator {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.8);
+            border: 3px solid rgba(255, 255, 255, 0.5);
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            display: none;
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.6);
+        }
+
+        .touch-indicator.active {
+            display: block;
+            background: rgba(255, 255, 255, 1);
+            box-shadow: 0 0 30px rgba(255, 255, 255, 0.8);
+        }
+
+        .values-display {
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 10px;
+            margin-top: 10px;
+        }
+
+        .value-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .value-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .value-label {
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+
+        .value-number {
+            font-size: 1.1em;
+            padding: 2px 8px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 5px;
+            min-width: 80px;
+            text-align: center;
+        }
+
+        .pitchbend {
+            color: #ffaaaa;
+        }
+
+        .modulation {
+            color: #aaffaa;
+        }
+
+        .sensitivity-display {
+            color: #aaaaff;
+        }
+
+        /* 灵敏度设置弹窗 */
+        .sensitivity-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1500;
+        }
+
+        .sensitivity-modal-content {
+            background: rgba(20, 20, 40, 0.95);
+            border-radius: 15px;
+            padding: 25px;
+            max-width: 350px;
+            width: 90%;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .modal-title {
+            text-align: center;
+            font-size: 1.3em;
+            font-weight: bold;
+            margin-bottom: 20px;
+            color: white;
+        }
+
+        .sensitivity-control-group {
+            margin-bottom: 25px;
+        }
+
+        .sensitivity-control-label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            font-size: 0.95em;
+            font-weight: bold;
+        }
+
+        .sensitivity-control-value {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 4px 10px;
+            border-radius: 15px;
+            font-size: 0.9em;
+            min-width: 50px;
+            text-align: center;
+        }
+
+        .sensitivity-control-slider {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 5px;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        .sensitivity-control-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+        }
+
+        .sensitivity-control-slider::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+        }
+
+        .modal-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 25px;
+        }
+
+        .modal-button {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            cursor: pointer;
+            min-width: 80px;
+            transition: all 0.2s ease;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .modal-button.primary {
+            background: #007acc;
+            color: white;
+        }
+
+        .modal-button.primary:hover,
+        .modal-button.primary:active {
+            background: #005c8a;
+            transform: scale(0.98);
+        }
+
+        .modal-button.secondary {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+        }
+
+        .modal-button.secondary:hover,
+        .modal-button.secondary:active {
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(0.98);
+        }
+
+        .reconnect-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .reconnect-message {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+        }
+
+        .spinner {
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-top: 3px solid white;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 480px) {
+            .container {
+                padding: 5px;
+            }
+            
+            .title {
+                font-size: 1.2em;
+            }
+            
+            .status {
+                padding: 0 10px;
+                font-size: 0.8em;
+            }
+            
+            .left-margin {
+                padding: 10px;
+            }
+            
+            .values-display {
+                padding: 10px;
+            }
+
+            .sensitivity-modal-content {
+                padding: 20px;
+                max-width: 320px;
+            }
+        }
+
+        /* 横屏警告 */
+        @media (orientation: landscape) {
+            .landscape-warning {
+                display: block;
+            }
+        }
+
+        .landscape-warning {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            text-align: center;
+            padding: 50px 20px;
+            z-index: 2000;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="title">🎹 Mobile MIDI Controller</div>
+            <button class="sensitivity-button" id="sensitivityButton">
+                灵敏度设置 (弯音: <span id="pitchSensDisplay">1.0</span>x, 调制: <span id="modSensDisplay">1.0</span>x)
+            </button>
+            <div class="status">
+                <div class="status-item">
+                    <div class="status-dot" id="wsStatus"></div>
+                    <span id="wsStatusText">连接中...</span>
+                </div>
+                <div class="status-item">
+                    <div class="status-dot" id="midiStatus"></div>
+                    <span id="midiStatusText">MIDI</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="control-area">
+            <div class="left-margin">
+                <div class="margin-label">触控区域</div>
+            </div>
+            <div class="xy-pad" id="xyPad">
+                <div class="active-area-overlay" id="activeAreaOverlay"></div>
+                <div class="touch-indicator" id="touchIndicator"></div>
+            </div>
+        </div>
+
+        <div class="values-display">
+            <div class="value-row">
+                <span class="value-label">弯音 (Pitchbend):</span>
+                <span class="value-number pitchbend" id="pitchValue">+0.000</span>
+            </div>
+            <div class="value-row">
+                <span class="value-label">调制 (Modulation):</span>
+                <span class="value-number modulation" id="modValue">0</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 灵敏度设置弹窗 -->
+    <div class="sensitivity-modal" id="sensitivityModal">
+        <div class="sensitivity-modal-content">
+            <div class="modal-title">🎛️ 灵敏度设置</div>
+            
+            <div class="sensitivity-control-group">
+                <div class="sensitivity-control-label">
+                    <span>🎵 弯音灵敏度</span>
+                    <span class="sensitivity-control-value" id="pitchSensValue">1.0x</span>
+                </div>
+                <input type="range" class="sensitivity-control-slider" id="pitchSensSlider" 
+                       min="0.5" max="2.0" step="0.1" value="1.0">
+            </div>
+
+            <div class="sensitivity-control-group">
+                <div class="sensitivity-control-label">
+                    <span>🌊 调制灵敏度</span>
+                    <span class="sensitivity-control-value" id="modSensValue">1.0x</span>
+                </div>
+                <input type="range" class="sensitivity-control-slider" id="modSensSlider" 
+                       min="0.5" max="2.0" step="0.1" value="1.0">
+            </div>
+
+            <div class="modal-buttons">
+                <button class="modal-button secondary" id="resetSensButton">重置</button>
+                <button class="modal-button primary" id="closeSensButton">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="reconnect-overlay" id="reconnectOverlay">
+        <div class="reconnect-message">
+            <div class="spinner"></div>
+            <div>重新连接中...</div>
+        </div>
+    </div>
+
+    <div class="landscape-warning">
+        <h2>📱 请竖屏使用</h2>
+        <p>为了最佳体验，请将手机竖直放置使用此MIDI控制器</p>
+    </div>
+
+    <script>
+        class MIDIController {
+            constructor() {
+                this.ws = null;
+                this.isConnected = false;
+                this.reconnectAttempts = 0;
+                this.maxReconnectAttempts = 5;
+                this.reconnectDelay = 1000;
+                this.isKickedOut = false; // 标记是否被踢下线
+                
+                this.currentPitchbend = 0;
+                this.currentModulation = 0;
+                this.pitchSensitivity = 1.0; // 弯音灵敏度，范围 0.5-2.0
+                this.modSensitivity = 1.0;   // 调制灵敏度，范围 0.5-2.0
+                this.isTracking = false;
+                this.lastTouchTime = null; // 上次触摸时间
+                
+                this.lastSendTime = 0;
+                this.sendThrottle = 8; // ~120fps, 更快响应
+                
+                // 持续发送定时器
+                this.continuousSendInterval = null;
+                this.continuousSendRate = 50; // 20fps持续发送
+                
+                this.xyPad = document.getElementById('xyPad');
+                this.touchIndicator = document.getElementById('touchIndicator');
+                this.activeAreaOverlay = document.getElementById('activeAreaOverlay');
+                
+                this.initElements();
+                this.initWebSocket();
+                this.initEventListeners();
+                this.startHeartbeat();
+                this.startContinuousSend(); // 启动持续发送
+                this.updateActiveArea(); // 初始化有效区域显示
+                this.updateSensitivityDisplay(); // 初始化灵敏度显示
+            }
+            
+            initElements() {
+                this.wsStatus = document.getElementById('wsStatus');
+                this.wsStatusText = document.getElementById('wsStatusText');
+                this.midiStatus = document.getElementById('midiStatus');
+                this.midiStatusText = document.getElementById('midiStatusText');
+                this.pitchValue = document.getElementById('pitchValue');
+                this.modValue = document.getElementById('modValue');
+                this.reconnectOverlay = document.getElementById('reconnectOverlay');
+                
+                // 灵敏度相关元素
+                this.sensitivityButton = document.getElementById('sensitivityButton');
+                this.sensitivityModal = document.getElementById('sensitivityModal');
+                this.pitchSensSlider = document.getElementById('pitchSensSlider');
+                this.modSensSlider = document.getElementById('modSensSlider');
+                this.pitchSensValue = document.getElementById('pitchSensValue');
+                this.modSensValue = document.getElementById('modSensValue');
+                this.pitchSensDisplay = document.getElementById('pitchSensDisplay');
+                this.modSensDisplay = document.getElementById('modSensDisplay');
+                this.resetSensButton = document.getElementById('resetSensButton');
+                this.closeSensButton = document.getElementById('closeSensButton');
+            }
+            
+            initWebSocket() {
+                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const wsUrl = `${protocol}//${window.location.hostname}:8001`;
+                
+                console.log('连接WebSocket:', wsUrl);
+                this.ws = new WebSocket(wsUrl);
+                
+                this.ws.onopen = () => {
+                    console.log('WebSocket连接成功');
+                    this.isConnected = true;
+                    this.reconnectAttempts = 0;
+                    this.updateConnectionStatus(true);
+                    this.hideReconnectOverlay();
+                    
+                    // 连接成功后立即启动持续发送
+                    this.startContinuousSend();
+                };
+                
+                this.ws.onclose = () => {
+                    console.log('WebSocket连接关闭');
+                    this.isConnected = false;
+                    this.updateConnectionStatus(false);
+                    this.stopContinuousSend(); // 连接关闭时停止持续发送
+                    this.scheduleReconnect();
+                };
+                
+                this.ws.onerror = (error) => {
+                    console.error('WebSocket错误:', error);
+                    this.isConnected = false;
+                    this.updateConnectionStatus(false);
+                    this.stopContinuousSend(); // 连接出错时停止持续发送
+                };
+                
+                this.ws.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        this.handleMessage(data);
+                    } catch (e) {
+                        console.error('消息解析错误:', e);
+                    }
+                };
+            }
+            
+            handleMessage(data) {
+                switch (data.type) {
+                    case 'status':
+                        this.updateMIDIStatus(data.data.midi_connected);
+                        break;
+                    case 'pong':
+                        // 心跳响应
+                        break;
+                    case 'disconnect':
+                        // 被服务器踢下线
+                        console.log('⚠️ 被新设备踢下线:', data.reason);
+                        this.isKickedOut = true; // 标记被踢下线，停止重连
+                        this.stopContinuousSend(); // 停止持续发送
+                        this.showKickedMessage(data.reason);
+                        break;
+                }
+            }
+            
+            showKickedMessage(reason) {
+                // 显示被踢下线的消息
+                const overlay = document.createElement('div');
+                overlay.style.cssText = `
+                    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+                    background: rgba(0,0,0,0.8); color: white; z-index: 9999;
+                    display: flex; align-items: center; justify-content: center;
+                    font-size: 18px; text-align: center; padding: 20px;
+                    -webkit-user-select: none; user-select: none;
+                `;
+                overlay.innerHTML = `
+                    <div style="max-width: 300px;">
+                        <h3 style="margin-bottom: 15px;">⚠️ 连接已断开</h3>
+                        <p style="margin-bottom: 15px;">${reason}</p>
+                        <p style="margin: 20px 0; font-size: 14px; color: #ccc; line-height: 1.4;">
+                            只有最新连接的设备可以控制MIDI<br>
+                            如需重新控制，请点击下方按钮
+                        </p>
+                        <div style="margin-top: 25px;">
+                            <button id="reconnectBtn" style="
+                                padding: 15px 25px; font-size: 16px; 
+                                background: #007acc; color: white; 
+                                border: none; border-radius: 8px; 
+                                cursor: pointer; margin: 0 8px;
+                                min-height: 44px; min-width: 120px;
+                                touch-action: manipulation;
+                                -webkit-appearance: none;
+                                -webkit-tap-highlight-color: rgba(0,0,0,0);
+                            ">重新连接</button>
+                            <button id="closeBtn" style="
+                                padding: 15px 25px; font-size: 16px; 
+                                background: #666; color: white; 
+                                border: none; border-radius: 8px; 
+                                cursor: pointer; margin: 0 8px;
+                                min-height: 44px; min-width: 120px;
+                                touch-action: manipulation;
+                                -webkit-appearance: none;
+                                -webkit-tap-highlight-color: rgba(0,0,0,0);
+                            ">关闭页面</button>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(overlay);
+                
+                // 等待DOM渲染完成后绑定事件
+                setTimeout(() => {
+                    const reconnectBtn = document.getElementById('reconnectBtn');
+                    const closeBtn = document.getElementById('closeBtn');
+                    
+                    if (reconnectBtn) {
+                        // 重新连接按钮 - 支持点击和触摸
+                        const handleReconnect = (e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            console.log('🔄 用户点击重新连接');
+                            
+                            this.isKickedOut = false; // 重置状态
+                            this.reconnectAttempts = 0; // 重置重连次数
+                            document.body.removeChild(overlay);
+                            this.initWebSocket(); // 重新连接
+                        };
+                        
+                        reconnectBtn.addEventListener('click', handleReconnect);
+                        reconnectBtn.addEventListener('touchstart', handleReconnect, { passive: false });
+                        reconnectBtn.addEventListener('touchend', (e) => {
+                            e.preventDefault();
+                        }, { passive: false });
+                        
+                        // 添加视觉反馈
+                        reconnectBtn.addEventListener('touchstart', () => {
+                            reconnectBtn.style.background = '#005c8a';
+                        });
+                        reconnectBtn.addEventListener('touchend', () => {
+                            setTimeout(() => {
+                                if (reconnectBtn.parentNode) {
+                                    reconnectBtn.style.background = '#007acc';
+                                }
+                            }, 100);
+                        });
+                    }
+                    
+                    if (closeBtn) {
+                        // 关闭页面按钮 - 支持点击和触摸
+                        const handleClose = (e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            console.log('❌ 用户选择关闭页面');
+                            
+                            // 尝试关闭窗口，如果失败则显示提示
+                            if (window.close) {
+                                window.close();
+                            }
+                            
+                            // 如果无法关闭窗口，显示提示
+                            setTimeout(() => {
+                                alert('请手动关闭此页面');
+                            }, 500);
+                        };
+                        
+                        closeBtn.addEventListener('click', handleClose);
+                        closeBtn.addEventListener('touchstart', handleClose, { passive: false });
+                        closeBtn.addEventListener('touchend', (e) => {
+                            e.preventDefault();
+                        }, { passive: false });
+                        
+                        // 添加视觉反馈
+                        closeBtn.addEventListener('touchstart', () => {
+                            closeBtn.style.background = '#444';
+                        });
+                        closeBtn.addEventListener('touchend', () => {
+                            setTimeout(() => {
+                                if (closeBtn.parentNode) {
+                                    closeBtn.style.background = '#666';
+                                }
+                            }, 100);
+                        });
+                    }
+                }, 100);
+            }
+            
+            startContinuousSend() {
+                // 启动持续发送定时器
+                if (this.continuousSendInterval) {
+                    clearInterval(this.continuousSendInterval);
+                }
+                
+                this.continuousSendInterval = setInterval(() => {
+                    // 持续发送当前位置，无论是否有触摸
+                    this.sendControlData(true); // 传入true表示是持续发送
+                }, this.continuousSendRate);
+                
+                console.log('🔄 启动持续发送定时器 (20fps)');
+            }
+            
+            stopContinuousSend() {
+                if (this.continuousSendInterval) {
+                    clearInterval(this.continuousSendInterval);
+                    this.continuousSendInterval = null;
+                    console.log('ℹ️ 停止持续发送定时器');
+                }
+            }
+            
+            updateConnectionStatus(connected) {
+                if (connected) {
+                    this.wsStatus.classList.add('connected');
+                    this.wsStatusText.textContent = '已连接';
+                    this.startContinuousSend(); // 连接时启动持续发送
+                } else {
+                    this.wsStatus.classList.remove('connected');
+                    this.wsStatusText.textContent = '断开';
+                    this.stopContinuousSend(); // 断开时停止持续发送
+                }
+            }
+            
+            updateMIDIStatus(connected) {
+                if (connected) {
+                    this.midiStatus.classList.add('connected');
+                    this.midiStatusText.textContent = 'MIDI已连接';
+                } else {
+                    this.midiStatus.classList.remove('connected');
+                    this.midiStatusText.textContent = 'MIDI断开';
+                }
+            }
+            
+            scheduleReconnect() {
+                // 如果被踢下线，不再尝试重连
+                if (this.isKickedOut) {
+                    console.log('🚫 已被踢下线，停止重连尝试');
+                    return;
+                }
+                
+                if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+                    console.log('达到最大重连次数，停止重连');
+                    this.hideReconnectOverlay();
+                    return;
+                }
+                
+                this.showReconnectOverlay();
+                this.reconnectAttempts++;
+                
+                setTimeout(() => {
+                    if (!this.isKickedOut) { // 再次检查是否被踢下线
+                        console.log(`第${this.reconnectAttempts}次重连尝试`);
+                        this.initWebSocket();
+                    }
+                }, this.reconnectDelay * this.reconnectAttempts);
+            }
+            
+            showReconnectOverlay() {
+                this.reconnectOverlay.style.display = 'flex';
+            }
+            
+            hideReconnectOverlay() {
+                this.reconnectOverlay.style.display = 'none';
+            }
+            
+            startHeartbeat() {
+                setInterval(() => {
+                    if (this.isConnected && this.ws.readyState === WebSocket.OPEN) {
+                        this.ws.send(JSON.stringify({ type: 'ping' }));
+                    }
+                }, 30000); // 30秒心跳
+            }
+            
+            updateSensitivityDisplay() {
+                // 更新按钮上的灵敏度显示
+                this.pitchSensDisplay.textContent = this.pitchSensitivity.toFixed(1);
+                this.modSensDisplay.textContent = this.modSensitivity.toFixed(1);
+                
+                // 更新弹窗中的显示
+                this.pitchSensValue.textContent = this.pitchSensitivity.toFixed(1) + 'x';
+                this.modSensValue.textContent = this.modSensitivity.toFixed(1) + 'x';
+                
+                // 更新滑块值
+                this.pitchSensSlider.value = this.pitchSensitivity;
+                this.modSensSlider.value = this.modSensitivity;
+                
+                // 更新有效区域显示
+                this.updateActiveArea();
+            }
+            
+            updateActiveArea() {
+                // 更新有效触摸区域显示
+                const rect = this.xyPad.getBoundingClientRect();
+                const overlay = this.activeAreaOverlay;
+                
+                // 计算有效区域大小
+                // 调制：从左边缘开始，宽度受调制灵敏度影响
+                const effectiveWidth = rect.width / this.modSensitivity;
+                
+                // 弯音：以中心为零点，高度受弯音灵敏度影响
+                const effectiveHeight = rect.height / this.pitchSensitivity;
+                
+                // 位置计算
+                const offsetX = 0; // 从左边缘开始（零点位置）
+                const offsetY = (rect.height - effectiveHeight) / 2; // 垂直居中（弯音零点在中心）
+                
+                // 确保不超出边界
+                const clampedWidth = Math.min(effectiveWidth, rect.width);
+                const clampedHeight = Math.min(effectiveHeight, rect.height);
+                const clampedOffsetY = Math.max(0, Math.min(rect.height - clampedHeight, offsetY));
+                
+                overlay.style.left = offsetX + 'px';
+                overlay.style.top = clampedOffsetY + 'px';
+                overlay.style.width = clampedWidth + 'px';
+                overlay.style.height = clampedHeight + 'px';
+            }
+            
+            showSensitivityModal() {
+                this.sensitivityModal.style.display = 'flex';
+            }
+            
+            hideSensitivityModal() {
+                this.sensitivityModal.style.display = 'none';
+            }
+            
+            resetSensitivity() {
+                this.pitchSensitivity = 1.0;
+                this.modSensitivity = 1.0;
+                this.updateSensitivityDisplay();
+            }
+            
+            initEventListeners() {
+                // 灵敏度按钮和弹窗事件
+                this.sensitivityButton.addEventListener('click', () => {
+                    this.showSensitivityModal();
+                });
+                
+                this.sensitivityButton.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    this.showSensitivityModal();
+                }, { passive: false });
+                
+                // 灵敏度滑块事件
+                this.pitchSensSlider.addEventListener('input', (e) => {
+                    this.pitchSensitivity = parseFloat(e.target.value);
+                    this.updateSensitivityDisplay();
+                });
+                
+                this.modSensSlider.addEventListener('input', (e) => {
+                    this.modSensitivity = parseFloat(e.target.value);
+                    this.updateSensitivityDisplay();
+                });
+                
+                // 弹窗按钮事件
+                this.resetSensButton.addEventListener('click', () => {
+                    this.resetSensitivity();
+                });
+                
+                this.closeSensButton.addEventListener('click', () => {
+                    this.hideSensitivityModal();
+                });
+                
+                // 点击弹窗背景关闭
+                this.sensitivityModal.addEventListener('click', (e) => {
+                    if (e.target === this.sensitivityModal) {
+                        this.hideSensitivityModal();
+                    }
+                });
+                
+                // 鼠标事件
+                this.xyPad.addEventListener('mousedown', this.handleStart.bind(this));
+                document.addEventListener('mousemove', this.handleMove.bind(this));
+                document.addEventListener('mouseup', this.handleEnd.bind(this));
+                document.addEventListener('mouseleave', this.handleEnd.bind(this)); // 鼠标离开页面
+                
+                // 触摸事件
+                this.xyPad.addEventListener('touchstart', this.handleStart.bind(this), { passive: false });
+                document.addEventListener('touchmove', this.handleMove.bind(this), { passive: false });
+                document.addEventListener('touchend', this.handleEnd.bind(this));
+                document.addEventListener('touchcancel', this.handleEnd.bind(this)); // 触摸被取消
+                
+                // 额外的安全事件处理
+                window.addEventListener('blur', this.forceReset.bind(this)); // 窗口失焦
+                window.addEventListener('beforeunload', () => {
+                    this.stopContinuousSend(); // 页面卸载时停止持续发送
+                });
+                document.addEventListener('visibilitychange', () => {
+                    if (document.hidden) {
+                        this.forceReset(); // 页面被隐藏
+                        this.stopContinuousSend(); // 停止持续发送
+                    } else {
+                        // 页面重新可见时重启持续发送
+                        if (this.isConnected) {
+                            this.startContinuousSend();
+                        }
+                    }
+                });
+                
+                // 响应窗口大小变化，更新有效区域
+                window.addEventListener('resize', () => {
+                    setTimeout(() => this.updateActiveArea(), 100);
+                });
+                
+                // 防止页面滚动和缩放
+                document.addEventListener('touchstart', (e) => {
+                    // 允许在弹窗内进行触摸操作
+                    if (!e.target.closest('.sensitivity-modal')) {
+                        e.preventDefault();
+                    }
+                }, { passive: false });
+                document.addEventListener('touchmove', (e) => {
+                    // 允许在弹窗内进行触摸操作
+                    if (!e.target.closest('.sensitivity-modal')) {
+                        e.preventDefault();
+                    }
+                }, { passive: false });
+                
+                // 添加定时器检查，防止归零失效
+                setInterval(this.checkAndReset.bind(this), 100); // 每100ms检查一次
+            }
+            
+            handleStart(event) {
+                event.preventDefault();
+                
+                // 防止多触点冲突
+                if (this.isTracking) {
+                    this.forceReset();
+                }
+                
+                this.isTracking = true;
+                this.touchIndicator.classList.add('active');
+                this.lastTouchTime = Date.now();
+                this.handleMove(event);
+                
+                if (this.isConnected) {
+                    console.log('🎯 开始触控');
+                }
+            }
+            
+            handleMove(event) {
+                if (!this.isTracking) return;
+                
+                event.preventDefault();
+                this.lastTouchTime = Date.now(); // 更新最后触摸时间
+                
+                // 获取触摸或鼠标位置
+                let clientX, clientY;
+                if (event.type.startsWith('touch')) {
+                    if (event.touches.length === 0) return;
+                    clientX = event.touches[0].clientX;
+                    clientY = event.touches[0].clientY;
+                } else {
+                    clientX = event.clientX;
+                    clientY = event.clientY;
+                }
+                
+                // 获取控制板边界
+                const rect = this.xyPad.getBoundingClientRect();
+                
+                // 计算相对位置
+                let x = clientX - rect.left;
+                let y = clientY - rect.top;
+                
+                // 边界约束：如果超出范围，约束到最近的边界点
+                x = Math.max(0, Math.min(rect.width, x));
+                y = Math.max(0, Math.min(rect.height, y));
+                
+                // 计算归一化值 (0-1)
+                const normalizedX = x / rect.width;
+                const normalizedY = 1 - (y / rect.height); // 0-1, 翻转Y轴
+                
+                // 零点位置：X轴左边缘(0)，Y轴中心(0.5)
+                // 调制：从左边缘0开始，向右增加
+                const modulation = Math.max(0, Math.min(1, normalizedX * this.modSensitivity));
+                
+                // 弯音：以垂直中心为零点，上下对称
+                const pitchDelta = (normalizedY - 0.5) * this.pitchSensitivity; // 相对于中心的偏移
+                const pitchbend = Math.max(-1, Math.min(1, pitchDelta * 2)); // 约束到 [-1, 1]
+                
+                this.currentPitchbend = pitchbend;
+                this.currentModulation = modulation;
+                
+                // 立即更新界面和发送数据（非持续发送）
+                this.updateDisplay();
+                this.updateTouchIndicator(x, y);
+                this.sendControlData(false); // 触摸移动时立即发送
+            }
+            
+            handleEnd(event) {
+                if (!this.isTracking) return;
+                
+                event.preventDefault();
+                console.log('🔄 触控结束，开始归零');
+                
+                this.performReset();
+            }
+            
+            forceReset() {
+                console.log('⚠️ 强制归零');
+                this.performReset();
+            }
+            
+            performReset() {
+                // 执行归零操作
+                this.isTracking = false;
+                this.touchIndicator.classList.remove('active');
+                
+                // 归零数值
+                this.currentPitchbend = 0;
+                this.currentModulation = 0;
+                
+                // 更新界面
+                this.updateDisplay();
+                
+                // 立即发送归零数据（多次发送确保成功，非持续发送）
+                this.sendControlData(false);
+                setTimeout(() => this.sendControlData(false), 10);  // 10ms后再发送一次
+                setTimeout(() => this.sendControlData(false), 50);  // 50ms后再发送一次
+                
+                console.log('✅ 归零完成');
+            }
+            
+            checkAndReset() {
+                // 定时检查：如果超过200ms没有触摸活动且不在跟踪状态，确保已归零
+                if (!this.isTracking && this.lastTouchTime && (Date.now() - this.lastTouchTime > 200)) {
+                    if (Math.abs(this.currentPitchbend) > 0.001 || this.currentModulation > 0.001) {
+                        console.log('⚠️ 检测到未归零，执行强制归零');
+                        this.currentPitchbend = 0;
+                        this.currentModulation = 0;
+                        this.updateDisplay();
+                        this.sendControlData(false); // 强制归零时立即发送
+                    }
+                    this.lastTouchTime = null;
+                }
+            }
+            
+            updateTouchIndicator(x, y) {
+                this.touchIndicator.style.left = x + 'px';
+                this.touchIndicator.style.top = y + 'px';
+            }
+            
+            updateDisplay() {
+                // 更新弯音显示
+                const pitchStr = this.currentPitchbend >= 0 ? 
+                    `+${this.currentPitchbend.toFixed(3)}` : 
+                    this.currentPitchbend.toFixed(3);
+                this.pitchValue.textContent = pitchStr;
+                
+                // 更新调制显示
+                const modMIDI = Math.round(this.currentModulation * 127);
+                this.modValue.textContent = modMIDI.toString();
+                
+                // 即时颜色反馈（无过渡效果）
+                const pitchIntensity = Math.abs(this.currentPitchbend);
+                const modIntensity = this.currentModulation;
+                
+                this.pitchValue.style.background = `rgba(255, ${Math.round(255 - pitchIntensity * 100)}, ${Math.round(255 - pitchIntensity * 100)}, 0.3)`;
+                this.modValue.style.background = `rgba(${Math.round(255 - modIntensity * 100)}, 255, ${Math.round(255 - modIntensity * 100)}, 0.3)`;
+            }
+            
+            sendControlData(isContinuous = false) {
+                if (!this.isConnected || this.ws.readyState !== WebSocket.OPEN) {
+                    if (!isContinuous) { // 只在非持续发送时显示警告
+                        console.warn('⚠️ WebSocket未连接，无法发送数据');
+                    }
+                    return;
+                }
+                
+                const data = {
+                    type: 'control',
+                    pitchbend: this.currentPitchbend,
+                    modulation: this.currentModulation,
+                    continuous: isContinuous, // 标记是否为持续发送
+                    pitchSensitivity: this.pitchSensitivity, // 发送弯音灵敏度信息
+                    modSensitivity: this.modSensitivity // 发送调制灵敏度信息
+                };
+                
+                try {
+                    this.ws.send(JSON.stringify(data));
+                    
+                    // 调试信息 - 只在触摸操作或归零时显示
+                    if (!isContinuous) {
+                        if (Math.abs(this.currentPitchbend) < 0.001 && this.currentModulation < 0.001) {
+                            console.log('🔄 发送归零数据:', data);
+                        }
+                    }
+                } catch (e) {
+                    if (!isContinuous) {
+                        console.error('❌ 发送数据错误:', e);
+                        
+                        // 如果发送失败，尝试重新连接
+                        if (this.ws.readyState !== WebSocket.OPEN) {
+                            this.scheduleReconnect();
+                        }
+                    }
+                }
+            }
+        }
+        
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            new MIDIController();
+        });
+        
+        // 防止页面刷新时的确认对话框
+        window.addEventListener('beforeunload', (e) => {
+            e.preventDefault();
+        });
+        
+        // 保持屏幕唤醒（如果支持）
+        if ('wakeLock' in navigator) {
+            navigator.wakeLock.request('screen').catch((err) => {
+                console.log('无法获取屏幕唤醒锁:', err.name, err.message);
+            });
+        }
+    </script>
+</body>
+</html>
